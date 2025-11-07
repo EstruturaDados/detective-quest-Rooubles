@@ -1,47 +1,190 @@
+// Desafio nivel aventureiro
+
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-// Desafio Detective Quest
-// Tema 4 - Árvores e Tabela Hash
-// Este código inicial serve como base para o desenvolvimento das estruturas de navegação, pistas e suspeitos.
-// Use as instruções de cada região para desenvolver o sistema completo com árvore binária, árvore de busca e tabela hash.
+// ---------- Estruturas ----------
+typedef struct {
+    char nome[50];
+    char pista[100];
+} Comodo;
 
-int main() {
+typedef struct no {
+    Comodo mansao;
+    struct no* esquerdo;
+    struct no* direito;
+} no;
 
-    // 🌱 Nível Novato: Mapa da Mansão com Árvore Binária
-    //
-    // - Crie uma struct Sala com nome, e dois ponteiros: esquerda e direita.
-    // - Use funções como criarSala(), conectarSalas() e explorarSalas().
-    // - A árvore pode ser fixa: Hall de Entrada, Biblioteca, Cozinha, Sótão etc.
-    // - O jogador deve poder explorar indo à esquerda (e) ou à direita (d).
-    // - Finalize a exploração com uma opção de saída (s).
-    // - Exiba o nome da sala a cada movimento.
-    // - Use recursão ou laços para caminhar pela árvore.
-    // - Nenhuma inserção dinâmica é necessária neste nível.
+typedef struct {
+    char historico[10][100];
+    int inicio;
+    int fim;
+    int total;
+} nav;
 
-    // 🔍 Nível Aventureiro: Armazenamento de Pistas com Árvore de Busca
-    //
-    // - Crie uma struct Pista com campo texto (string).
-    // - Crie uma árvore binária de busca (BST) para inserir as pistas coletadas.
-    // - Ao visitar salas específicas, adicione pistas automaticamente com inserirBST().
-    // - Implemente uma função para exibir as pistas em ordem alfabética (emOrdem()).
-    // - Utilize alocação dinâmica e comparação de strings (strcmp) para organizar.
-    // - Não precisa remover ou balancear a árvore.
-    // - Use funções para modularizar: inserirPista(), listarPistas().
-    // - A árvore de pistas deve ser exibida quando o jogador quiser revisar evidências.
+// ---------- Dados ----------
+Comodo comodos[10] = {
+    {"Hall de entrada", ""},
+    {"Sala de estar", "Pegada de lama"},
+    {"Biblioteca", "Livro faltando pag"},
+    {"Quarto", "Lençol manchado"},
+    {"Cozinha", ""},
+    {"Porao", "Gaveta perdida"},
+    {"Sotao", "Chave perdida"},
+    {"Varanda", ""},
+    {"Banheiro", "espelho embaçado"},
+    {"Area de servico", ""}
+};
 
-    // 🧠 Nível Mestre: Relacionamento de Pistas com Suspeitos via Hash
-    //
-    // - Crie uma struct Suspeito contendo nome e lista de pistas associadas.
-    // - Crie uma tabela hash (ex: array de ponteiros para listas encadeadas).
-    // - A chave pode ser o nome do suspeito ou derivada das pistas.
-    // - Implemente uma função inserirHash(pista, suspeito) para registrar relações.
-    // - Crie uma função para mostrar todos os suspeitos e suas respectivas pistas.
-    // - Adicione um contador para saber qual suspeito foi mais citado.
-    // - Exiba ao final o “suspeito mais provável” baseado nas pistas coletadas.
-    // - Para hashing simples, pode usar soma dos valores ASCII do nome ou primeira letra.
-    // - Em caso de colisão, use lista encadeada para tratar.
-    // - Modularize com funções como inicializarHash(), buscarSuspeito(), listarAssociacoes().
-
-    return 0;
+// ---------- Utilitários ----------
+void limparBufferEntrada() {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
 }
 
+void pausa() {
+    printf("\nTecle enter para continuar...\n");
+    getchar();
+}
+
+// ---------- Árvore ----------
+no* criarSala(Comodo c) {
+    no* novo = malloc(sizeof(no));
+    if (!novo) {
+        printf("Erro de memória\n");
+        exit(1);
+    }
+    strcpy(novo->mansao.nome, c.nome);
+    strcpy(novo->mansao.pista, c.pista);
+    novo->esquerdo = NULL;
+    novo->direito = NULL;
+    return novo;
+}
+
+no* inserir(no* raiz, Comodo c) {
+    if (raiz == NULL) 
+        return criarSala(c);
+
+    if (strcmp(c.nome, raiz->mansao.nome) < 0)
+        raiz->esquerdo = inserir(raiz->esquerdo, c);
+    else if (strcmp(c.nome, raiz->mansao.nome) > 0)
+        raiz->direito = inserir(raiz->direito, c);
+
+    return raiz;
+}
+
+void liberar(no* raiz) {
+    if (raiz != NULL) {
+        liberar(raiz->esquerdo);
+        liberar(raiz->direito);
+        free(raiz);
+    }
+}
+
+// ---------- Histórico ----------
+void inicializarHistorico(nav* h) {
+    h->inicio = 0;
+    h->fim = 0;
+    h->total = 0;
+}
+
+void registrarPasso(nav* h, const char* sala) {
+    if (h->total < 10) {
+        strcpy(h->historico[h->fim], sala);
+        h->fim++;
+        h->total++;
+    } else {
+        printf("Histórico cheio!\n");
+    }
+}
+
+void mostrarHistorico(nav* h, const char* titulo) {
+    printf("\n%s:\n", titulo);
+    if (h->total == 0) {
+        printf("Nenhum registro ainda.\n\n");
+        return;
+    }
+    for (int i = 0; i < h->total; i++) {
+        printf(" - %s\n", h->historico[i]);
+    }
+    printf("\n");
+}
+
+// ---------- Jogo ----------
+int main() {
+    no* mansao = NULL;
+    nav historico;
+    nav pistas;
+    inicializarHistorico(&historico);
+    inicializarHistorico(&pistas);
+
+    // Criar a mansão (árvore binária)
+    for (int i = 0; i < 10; i++) {
+        mansao = inserir(mansao, comodos[i]);
+    }
+
+    no* posicao_atual = mansao;
+    int opcao;
+
+    printf("\n============= Detective Quest =============\n");
+
+    do {
+        printf("\nVocê está em: %s\n", posicao_atual->mansao.nome);
+
+        // Se houver pista, mostrar e registrar
+        if (strlen(posicao_atual->mansao.pista) > 0) {
+            printf("Há uma pista aqui: %s\n", posicao_atual->mansao.pista);
+            registrarPasso(&pistas, posicao_atual->mansao.pista);
+        }
+
+        printf("===========================================\n");
+        printf("(1) Ir para a sala à esquerda\n");
+        printf("(2) Ir para a sala à direita\n");
+        printf("(3) Ver histórico de navegação\n");
+        printf("(4) Ver histórico de pistas\n");
+        printf("(0) Sair\n");
+        printf("Escolha uma opção: ");
+        scanf("%d", &opcao);
+        limparBufferEntrada();
+
+        switch (opcao) {
+            case 1:
+                if (posicao_atual->esquerdo) {
+                    posicao_atual = posicao_atual->esquerdo;
+                    registrarPasso(&historico, posicao_atual->mansao.nome);
+                } else {
+                    printf("Não há sala à esquerda!\n");
+                }
+                pausa();
+                break;
+            case 2:
+                if (posicao_atual->direito) {
+                    posicao_atual = posicao_atual->direito;
+                    registrarPasso(&historico, posicao_atual->mansao.nome);
+                } else {
+                    printf("Não há sala à direita!\n");
+                }
+                pausa();
+                break;
+            case 3:
+                mostrarHistorico(&historico, "Histórico de navegação");
+                pausa();
+                break;
+            case 4:
+                mostrarHistorico(&pistas, "Pistas encontradas");
+                pausa();
+                break;
+            case 0:
+                printf("Saindo...\n");
+                break;
+            default:
+                printf("Opção inválida!\n");
+                pausa();
+        }
+
+    } while (opcao != 0);
+
+    liberar(mansao);
+    return 0;
+}
